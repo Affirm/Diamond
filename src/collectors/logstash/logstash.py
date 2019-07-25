@@ -85,20 +85,24 @@ class LogstashCollector(diamond.collector.Collector):
             self.log.error('Could not load node stats')
             return
 
-        subtrees_to_collect = ['jvm', 'process', 'pipeline']
+        subtrees_to_collect = ['jvm', 'process', 'pipelines']
         result = {k:v for k,v in result.iteritems() if any(k == x for x in subtrees_to_collect)}
 
         # convert pipeline.plugins array into hash
+        events_hash = {}
         plugins_hash = {}
-        for plugin_type,plugins_array in result['pipeline']['plugins'].iteritems():
-            plugins_hash[plugin_type] = {}
-            for plugin in plugins_array:
-                if 'events' in plugin:
-                    plugins_hash[plugin_type].update({ plugin['id']: plugin['events'] })
+        for pipeline_name, pipeline_dict in result['pipelines'].iteritems():
+            events_hash[pipeline_name] = pipeline_dict['events']
+            for plugin_type, plugins_array in pipeline_dict['plugins'].iteritems():
+                keyname = pipeline_name + '.' + plugin_type
+                plugins_hash[keyname] = {}
+                for plugin in plugins_array:
+                    if 'events' in plugin:
+                        plugins_hash[keyname].update({ plugin['id']: plugin['events'] })
 
         # keep only events and plugins subtrees in resulting pipeline hash
-        result['pipeline'] = {
-            'events': result['pipeline']['events'],
+        result['pipelines'] = {
+            'events': events_hash,
             'plugins': plugins_hash,
         }
 
@@ -106,6 +110,6 @@ class LogstashCollector(diamond.collector.Collector):
 
         for key in self.metrics:
             self.log.debug('%s: %s', key, self.metrics[key])
-            if key in self.metrics:
-                self.publish(key, self.metrics[key])
+	    self.publish(key, self.metrics[key])
+
 
